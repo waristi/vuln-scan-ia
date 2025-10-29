@@ -1,0 +1,15 @@
+.gradle/
+build/
+bin/
+.git/
+.gitignore
+*.md
+*.iml
+.idea/
+.vscode/
+node_modules/
+.env
+*.log
+docker-compose.yml
+Dockerfile
+.github/
