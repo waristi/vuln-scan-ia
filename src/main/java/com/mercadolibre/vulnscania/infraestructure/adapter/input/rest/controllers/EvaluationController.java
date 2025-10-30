@@ -1,7 +1,6 @@
 package com.mercadolibre.vulnscania.infraestructure.adapter.input.rest.controllers;
 
 import com.mercadolibre.vulnscania.application.service.VulnerabilityAnalysisService;
-import com.mercadolibre.vulnscania.domain.port.output.IAServicePort;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

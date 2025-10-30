@@ -33,8 +33,14 @@ dependencies {
     // MySQL Driver
     implementation 'com.mysql:mysql-connector-j:9.0.0'
     
-    // OpenAI Client
+    // OpenAI Client (official)
     implementation 'com.openai:openai-java:4.0.0'
+
+    // Anthropic Claude (official Java SDK)
+    implementation 'com.anthropic:anthropic-java:0.7.0'
+
+    // Google Gemini (Generative AI Java SDK)
+    implementation 'com.google.genai:google-genai:1.0.0'
     
     // JSON Processing
     implementation 'com.fasterxml.jackson.core:jackson-databind'
