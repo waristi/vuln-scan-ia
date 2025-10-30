@@ -1,4 +1,4 @@
-package com.mercadolibre.vulnscania.infraestructure.configuration;
+package com.mercadolibre.vulnscania.infraestructure.configuration.LLM;
 
 import com.google.genai.Client;
 import org.springframework.beans.factory.annotation.Value;

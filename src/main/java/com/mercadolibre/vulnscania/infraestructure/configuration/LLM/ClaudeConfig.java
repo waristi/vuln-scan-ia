@@ -1,4 +1,4 @@
-package com.mercadolibre.vulnscania.infraestructure.configuration;
+package com.mercadolibre.vulnscania.infraestructure.configuration.LLM;
 
 import com.anthropic.client.AnthropicClient;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;

@@ -1,4 +1,4 @@
-package com.mercadolibre.vulnscania.infraestructure.configuration;
+package com.mercadolibre.vulnscania.infraestructure.configuration.LLM;
 
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;

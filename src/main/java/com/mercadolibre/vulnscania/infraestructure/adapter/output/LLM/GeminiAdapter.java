@@ -1,4 +1,4 @@
-package com.mercadolibre.vulnscania.infraestructure.adapter.output;
+package com.mercadolibre.vulnscania.infraestructure.adapter.output.LLM;
 
 import com.google.genai.Client;
 import com.mercadolibre.vulnscania.domain.port.output.IAServicePort;

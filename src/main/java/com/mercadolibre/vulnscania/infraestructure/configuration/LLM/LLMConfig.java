@@ -1,9 +1,9 @@
-package com.mercadolibre.vulnscania.infraestructure.configuration;
+package com.mercadolibre.vulnscania.infraestructure.configuration.LLM;
 
 import com.mercadolibre.vulnscania.domain.port.output.IAServicePort;
-import com.mercadolibre.vulnscania.infraestructure.adapter.output.ClaudeAdapter;
-import com.mercadolibre.vulnscania.infraestructure.adapter.output.GeminiAdapter;
-import com.mercadolibre.vulnscania.infraestructure.adapter.output.OpenAIAdapter;
+import com.mercadolibre.vulnscania.infraestructure.adapter.output.LLM.ClaudeAdapter;
+import com.mercadolibre.vulnscania.infraestructure.adapter.output.LLM.GeminiAdapter;
+import com.mercadolibre.vulnscania.infraestructure.adapter.output.LLM.OpenAIAdapter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Bean;
