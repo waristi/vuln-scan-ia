@@ -1,22 +1,26 @@
 package com.mercadolibre.vulnscania.application.usecase;
 
+import com.mercadolibre.vulnscania.application.port.input.RegisterApplicationInputPort;
 import com.mercadolibre.vulnscania.domain.command.RegisterApplicationCommand;
 import com.mercadolibre.vulnscania.domain.exception.ApplicationAlreadyExistsException;
 import com.mercadolibre.vulnscania.domain.model.application.Application;
 import com.mercadolibre.vulnscania.domain.port.output.ApplicationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Use Case: Register Application
  * 
  * Registers a new application in the system with its context information.
  * Validates that application doesn't already exist.
+ * 
+ * NOTE: This class is framework-independent. Transaction management is handled
+ * at the infrastructure layer (controllers) to maintain hexagonal architecture.
+ * 
+ * <p>This use case implements the RegisterApplicationInputPort interface,
+ * following the Dependency Inversion Principle (SOLID).</p>
  */
-@Service
-public class RegisterApplicationUseCase {
+public class RegisterApplicationUseCase implements RegisterApplicationInputPort {
     
     private static final Logger log = LoggerFactory.getLogger(RegisterApplicationUseCase.class);
     
@@ -26,7 +30,15 @@ public class RegisterApplicationUseCase {
         this.applicationRepository = applicationRepository;
     }
     
-    @Transactional
+    /**
+     * Executes the application registration use case.
+     * 
+     * NOTE: Transactional behavior is managed at the infrastructure layer (controller).
+     * 
+     * @param command the registration command with application details
+     * @return the application result with generated ID
+     */
+    @Override
     public ApplicationResult execute(RegisterApplicationCommand command) {
         log.info("Registering application: {}", command.name());
         
