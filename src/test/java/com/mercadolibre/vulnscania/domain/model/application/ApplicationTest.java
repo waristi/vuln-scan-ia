@@ -55,7 +55,7 @@ class ApplicationTest {
             List.of(),
             false,
             DataSensitivity.INTERNAL,
-            List.of("PRODUCTION")
+            List.of("production")  // lowercase
         );
         
         Application devApp = Application.create(
@@ -64,7 +64,7 @@ class ApplicationTest {
             List.of(),
             false,
             DataSensitivity.INTERNAL,
-            List.of("DEVELOPMENT")
+            List.of("development")
         );
         
         // When/Then
@@ -74,14 +74,14 @@ class ApplicationTest {
     
     @Test
     void shouldCheckIfCriticalInfrastructure() {
-        // Given
+        // Given - Requires: internet exposed + special protection + production
         Application app = Application.create(
             "Test App",
             List.of("Java"),
             List.of(),
-            false,
-            DataSensitivity.HIGHLY_REGULATED,  // High sensitivity implies critical
-            List.of("PRODUCTION")
+            true,  // internet exposed
+            DataSensitivity.HIGHLY_REGULATED,  // requires special protection
+            List.of("production")  // in production
         );
         
         // When/Then
@@ -140,7 +140,7 @@ class ApplicationTest {
         // Then
         assertThat(app.getName()).isEqualTo("Updated App");
         assertThat(app.isInternetExposed()).isTrue();
-          assertThat(app.getDataSensitivity()).isEqualTo(DataSensitivity.SENSITIVE);
+        assertThat(app.getDataSensitivity()).isEqualTo(DataSensitivity.SENSITIVE);
     }
     
     @Test
