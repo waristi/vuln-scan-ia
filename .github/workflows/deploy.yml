@@ -85,17 +85,97 @@ jobs:
             echo "Pulling image (Docker will auto-select matching platform)..."
             sudo docker pull ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
             
-            echo "Starting new container..."
+            echo "Checking available system resources..."
+            # Calculate available resources - be conservative on shared servers
+            AVAILABLE_MEM_MB=$(free -m | awk 'NR==2{print $7}')
+            CPU_COUNT=$(nproc)
+            
+            # Check if there are other containers running
+            OTHER_CONTAINERS=$(sudo docker ps --format "{{.Names}}" | grep -v "${{ env.CONTAINER_NAME }}" | wc -l)
+            
+            # Be very conservative on shared/constrained servers
+            if [ $OTHER_CONTAINERS -ge 5 ]; then
+              MEMORY_PERCENT=25
+              echo "⚠️  Detected $OTHER_CONTAINERS other containers - using very conservative allocation (25%)"
+            elif [ $OTHER_CONTAINERS -gt 0 ]; then
+              MEMORY_PERCENT=30
+              echo "Detected $OTHER_CONTAINERS other containers running - using conservative allocation (30%)"
+            else
+              MEMORY_PERCENT=40
+            fi
+            
+            # If available memory is very low (< 1GB), be even more conservative
+            if [ $AVAILABLE_MEM_MB -lt 1000 ]; then
+              MEMORY_PERCENT=$((MEMORY_PERCENT - 5))
+              echo "⚠️  Low available memory detected - reducing allocation to ${MEMORY_PERCENT}%"
+            fi
+            
+            CONTAINER_MEM_MB=$((AVAILABLE_MEM_MB * MEMORY_PERCENT / 100))
+            
+            # Cap at 512MB max on constrained servers, 1GB if plenty of resources
+            if [ $AVAILABLE_MEM_MB -lt 1500 ]; then
+              MAX_MEM=512
+            else
+              MAX_MEM=1024
+            fi
+            
+            if [ $CONTAINER_MEM_MB -gt $MAX_MEM ]; then
+              CONTAINER_MEM_MB=$MAX_MEM
+            fi
+            
+            # Adjust minimum based on available resources
+            if [ $AVAILABLE_MEM_MB -lt 500 ]; then
+              MIN_MEM=128
+              echo "⚠️  Very constrained server - using absolute minimum memory (128MB)"
+            elif [ $AVAILABLE_MEM_MB -lt 800 ]; then
+              MIN_MEM=192
+            else
+              MIN_MEM=256
+            fi
+            
+            if [ $CONTAINER_MEM_MB -lt $MIN_MEM ]; then
+              CONTAINER_MEM_MB=$MIN_MEM
+            fi
+            
+            # JVM heap should be ~60% of container memory (leaving room for metaspace, etc)
+            JVM_HEAP_MB=$((CONTAINER_MEM_MB * 60 / 100))
+            # Ensure minimum heap of 128MB
+            if [ $JVM_HEAP_MB -lt 128 ]; then
+              JVM_HEAP_MB=128
+            fi
+            # Calculate CPU limit (use 50% of available CPUs, max 1 core, min 0.5)
+            # Use integer math: if 2+ CPUs, use 1.0; if 1 CPU, use 0.5
+            if [ $CPU_COUNT -ge 2 ]; then
+              CPU_LIMIT="1.0"
+            else
+              CPU_LIMIT="0.5"
+            fi
+            
+            echo "System resources:"
+            echo "  Available memory: ${AVAILABLE_MEM_MB} MB"
+            echo "  CPUs: ${CPU_COUNT}"
+            echo "Container configuration:"
+            echo "  Memory: ${CONTAINER_MEM_MB}MB"
+            echo "  CPU: ${CPU_LIMIT} cores"
+            echo "  JVM Heap: ${JVM_HEAP_MB}MB"
+            echo ""
+            
+            echo "Starting new container with calculated resources..."
             # Docker will use the image matching the host architecture automatically
             # No need for --platform flag if experimental features are not enabled
             CONTAINER_ID=$(sudo docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
-              --ulimit nproc=4096:4096 \
+              --memory="${CONTAINER_MEM_MB}m" \
+              --memory-swap="${CONTAINER_MEM_MB}m" \
+              --cpus="${CPU_LIMIT}" \
+              --ulimit nproc=1024:2048 \
               --ulimit nofile=65536:65536 \
+              --ulimit memlock=-1:-1 \
               -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE=production \
               -e SERVER_PORT=8080 \
+              -e JAVA_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m -XX:MaxMetaspaceSize=128m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:ParallelGCThreads=1 -XX:ConcGCThreads=1 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xss256k" \
               -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               -e AI_PROVIDER_ACTIVE=gemini \
