@@ -7,7 +7,7 @@ services:
     container_name: vulnscan-mongodb
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "27018:27017"  # Cambiado a 27018 para evitar conflicto con otros MongoDB
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: admin123
@@ -59,6 +59,7 @@ services:
       SPRING_APPLICATION_NAME: vuln-scan-ia
 
       # MongoDB Configuration
+      # Nota: Dentro de Docker usa el puerto interno 27017, el puerto externo 27018 es solo para acceso desde el host
       MONGODB_URI: mongodb://admin:admin123@mongodb:27017/vulnscan?authSource=admin
 
       # AI Provider Selection
