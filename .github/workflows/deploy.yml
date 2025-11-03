@@ -85,18 +85,40 @@ jobs:
               --restart unless-stopped \
               -p 8182:8080 \
               -e SPRING_PROFILES_ACTIVE=production \
+              -e SERVER_PORT=8080 \
               -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -e AI_PROVIDER_ACTIVE=gemini \
+              -e AI_GEMINI_ENABLED=true \
               -e AI_GEMINI_API_KEY="${{ secrets.AI_GEMINI_API_KEY }}" \
+              -e AI_GEMINI_MODEL=gemini-2.5-flash \
+              -e AI_OPENAI_ENABLED=false \
               -e AI_OPENAI_API_KEY="${{ secrets.AI_OPENAI_API_KEY }}" \
+              -e AI_CLAUDE_ENABLED=false \
               -e AI_CLAUDE_API_KEY="${{ secrets.AI_CLAUDE_API_KEY }}" \
+              -e AI_FALLBACK_ENABLED=true \
+              -e NVD_API_URL=https://services.nvd.nist.gov/rest/json/cves/2.0 \
               ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
             
-            echo "Waiting for container to be healthy..."
-            sleep 10
+            echo "Waiting for container to start..."
+            sleep 5
             
             echo "Checking container status..."
-            sudo docker ps | grep ${{ env.CONTAINER_NAME }}
+            sudo docker ps -a | grep ${{ env.CONTAINER_NAME }} || echo "Container not found"
             
-            echo "Checking container logs..."
-            sudo docker logs --tail 50 ${{ env.CONTAINER_NAME }}
+            echo "Checking container state..."
+            sudo docker inspect ${{ env.CONTAINER_NAME }} --format='Status: {{.State.Status}}' || echo "Cannot inspect container"
+            sudo docker inspect ${{ env.CONTAINER_NAME }} --format='Error: {{.State.Error}}' || echo "No error info"
+            
+            echo "Checking container logs (last 100 lines)..."
+            sudo docker logs --tail 100 ${{ env.CONTAINER_NAME }} || echo "Cannot retrieve logs"
+            
+            echo "Checking if container is running..."
+            if sudo docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
+              echo "✅ Container is running"
+            else
+              echo "❌ Container is NOT running. Attempting to start..."
+              sudo docker start ${{ env.CONTAINER_NAME }} || echo "Failed to start container"
+              sleep 3
+              sudo docker logs --tail 50 ${{ env.CONTAINER_NAME }} || echo "Cannot retrieve logs after start"
+            fi
