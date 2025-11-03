@@ -91,7 +91,7 @@ jobs:
             CONTAINER_ID=$(sudo docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
-              -p 8182:8080 \
+              -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE=production \
               -e SERVER_PORT=8080 \
               -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
