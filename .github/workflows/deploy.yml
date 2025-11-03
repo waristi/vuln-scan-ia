@@ -124,11 +124,18 @@ jobs:
             fi
             
             # Adjust minimum based on available resources
+            # For extremely constrained servers, use absolute minimum
             if [ $AVAILABLE_MEM_MB -lt 500 ]; then
               MIN_MEM=128
               echo "⚠️  Very constrained server - using absolute minimum memory (128MB)"
+              # Force very minimal JVM settings for servers with < 500MB
+              JVM_HEAP_MB=96
             elif [ $AVAILABLE_MEM_MB -lt 800 ]; then
               MIN_MEM=192
+              # If calculated heap is too small, use minimum viable
+              if [ $JVM_HEAP_MB -lt 96 ]; then
+                JVM_HEAP_MB=96
+              fi
             else
               MIN_MEM=256
             fi
@@ -176,7 +183,7 @@ jobs:
               -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE=production \
               -e SERVER_PORT=8080 \
-              -e JAVA_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m -XX:MaxMetaspaceSize=128m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss256k -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap" \
+              -e JAVA_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m -XX:MaxMetaspaceSize=96m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss128k -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:+DisableAttachMechanism -Dspring.jmx.enabled=false" \
               -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               -e AI_PROVIDER_ACTIVE=gemini \
@@ -220,6 +227,31 @@ jobs:
             
             echo "Checking container logs (last 100 lines)..."
             sudo docker logs --tail 100 ${{ env.CONTAINER_NAME }} || echo "Cannot retrieve logs"
+            
+            # Check process count inside container
+            echo "Checking processes inside container..."
+            if sudo docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
+              PROCESS_COUNT=$(sudo docker exec ${{ env.CONTAINER_NAME }} ps aux 2>/dev/null | wc -l || echo "0")
+              echo "Process count: $PROCESS_COUNT"
+              
+              if [ "$PROCESS_COUNT" -le "1" ]; then
+                echo "⚠️  WARNING: Container appears to have no processes running!"
+                echo "This suggests the Java process is crashing immediately."
+                echo "Checking for crash dumps..."
+                sudo docker exec ${{ env.CONTAINER_NAME }} ls -la /app/hs_err_*.log 2>/dev/null || echo "No crash dump files found"
+                echo "Checking if Java executable exists..."
+                sudo docker exec ${{ env.CONTAINER_NAME }} which java || echo "Java not found in PATH"
+                echo "Checking Java version..."
+                sudo docker exec ${{ env.CONTAINER_NAME }} java -version 2>&1 || echo "Java execution failed"
+                echo "Listing /app directory..."
+                sudo docker exec ${{ env.CONTAINER_NAME }} ls -la /app/ || echo "Cannot list /app"
+              else
+                echo "Container has processes running - checking Java process..."
+                sudo docker exec ${{ env.CONTAINER_NAME }} ps aux | grep java || echo "No Java process found"
+              fi
+            else
+              echo "Container is not running - cannot check processes"
+            fi
             
             echo "Checking if container is running..."
             if sudo docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
