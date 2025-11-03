@@ -46,6 +46,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
@@ -77,10 +78,27 @@ jobs:
             sudo docker rmi ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }} || true
             
             echo "Pulling latest image..."
-            sudo docker pull ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+            # Detect architecture and pull appropriate platform
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+              echo "Detected ARM64 architecture, pulling linux/arm64 image..."
+              sudo docker pull --platform linux/arm64 ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+            else
+              echo "Detected AMD64/x86_64 architecture, pulling linux/amd64 image..."
+              sudo docker pull --platform linux/amd64 ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+            fi
             
             echo "Starting new container..."
-            sudo docker run -d \
+            # Detect architecture for platform flag
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+              PLATFORM_FLAG="--platform linux/arm64"
+            else
+              PLATFORM_FLAG="--platform linux/amd64"
+            fi
+            
+            CONTAINER_ID=$(sudo docker run -d \
+              $PLATFORM_FLAG \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
               -p 8182:8080 \
@@ -98,10 +116,27 @@ jobs:
               -e AI_CLAUDE_API_KEY="${{ secrets.AI_CLAUDE_API_KEY }}" \
               -e AI_FALLBACK_ENABLED=true \
               -e NVD_API_URL=https://services.nvd.nist.gov/rest/json/cves/2.0 \
-              ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
+              ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }} 2>&1)
+            
+            echo "Container creation output: $CONTAINER_ID"
+            
+            if [ -z "$CONTAINER_ID" ] || echo "$CONTAINER_ID" | grep -q "Error"; then
+              echo "❌ Failed to create container: $CONTAINER_ID"
+              exit 1
+            fi
             
             echo "Waiting for container to start..."
-            sleep 5
+            sleep 15
+            
+            # Immediately check logs to catch early startup errors
+            echo "Checking initial logs for errors..."
+            sudo docker logs --tail 50 ${{ env.CONTAINER_NAME }} 2>&1 || echo "Cannot retrieve initial logs"
+            
+            # Check if container exists and its status
+            if ! sudo docker ps -a | grep -q ${{ env.CONTAINER_NAME }}; then
+              echo "❌ Container was not created!"
+              exit 1
+            fi
             
             echo "Checking container status..."
             sudo docker ps -a | grep ${{ env.CONTAINER_NAME }} || echo "Container not found"
@@ -116,9 +151,40 @@ jobs:
             echo "Checking if container is running..."
             if sudo docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
               echo "✅ Container is running"
+              echo "Container ports:"
+              sudo docker port ${{ env.CONTAINER_NAME }}
             else
-              echo "❌ Container is NOT running. Attempting to start..."
-              sudo docker start ${{ env.CONTAINER_NAME }} || echo "Failed to start container"
-              sleep 3
-              sudo docker logs --tail 50 ${{ env.CONTAINER_NAME }} || echo "Cannot retrieve logs after start"
+              echo "❌ Container is NOT running. Current status:"
+              sudo docker ps -a | grep ${{ env.CONTAINER_NAME }}
+              
+              echo "Attempting to start container..."
+              if sudo docker start ${{ env.CONTAINER_NAME }}; then
+                echo "Container start command executed"
+                sleep 5
+                echo "Container status after start:"
+                sudo docker ps -a | grep ${{ env.CONTAINER_NAME }}
+                
+                if sudo docker ps | grep -q ${{ env.CONTAINER_NAME }}; then
+                  echo "✅ Container is now running"
+                  echo "Container ports:"
+                  sudo docker port ${{ env.CONTAINER_NAME }}
+                else
+                  echo "❌ Container still not running. Showing full error details:"
+                  sudo docker inspect ${{ env.CONTAINER_NAME }} --format='{{json .State}}' | python3 -m json.tool || sudo docker inspect ${{ env.CONTAINER_NAME }}
+                  echo "Recent logs:"
+                  sudo docker logs --tail 100 ${{ env.CONTAINER_NAME }} || echo "Cannot retrieve logs"
+                  exit 1
+                fi
+              else
+                echo "❌ Failed to start container. Error details:"
+                sudo docker inspect ${{ env.CONTAINER_NAME }} --format='{{json .State}}' | python3 -m json.tool || sudo docker inspect ${{ env.CONTAINER_NAME }}
+                echo "Recent logs:"
+                sudo docker logs --tail 100 ${{ env.CONTAINER_NAME }} || echo "Cannot retrieve logs"
+                exit 1
+              fi
             fi
+            
+            echo ""
+            echo "✅ Deployment completed successfully!"
+            echo "Container is accessible at: http://localhost:8182"
+            echo "API Swagger UI: http://localhost:8182/swagger-ui.html"
