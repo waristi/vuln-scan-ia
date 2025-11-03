@@ -25,6 +25,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  */
 @Configuration
 @EnableWebSecurity
+@org.springframework.context.annotation.Profile("!test")
 public class SecurityConfiguration {
     
     private final TokenGeneratorPort tokenValidator;

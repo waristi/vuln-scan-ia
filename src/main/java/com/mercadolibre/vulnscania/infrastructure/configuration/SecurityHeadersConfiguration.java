@@ -29,6 +29,7 @@ import java.io.IOException;
  * the domain or application layers, maintaining hexagonal architecture principles.</p>
  */
 @Configuration
+@org.springframework.context.annotation.Profile("!test")
 public class SecurityHeadersConfiguration extends OncePerRequestFilter {
 
     private static final String X_CONTENT_TYPE_OPTIONS = "X-Content-Type-Options";
