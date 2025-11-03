@@ -88,7 +88,18 @@ jobs:
             echo "Checking available system resources..."
             # Calculate available resources - be conservative on shared servers
             AVAILABLE_MEM_MB=$(free -m | awk 'NR==2{print $7}')
+            TOTAL_MEM_MB=$(free -m | awk 'NR==2{print $2}')
             CPU_COUNT=$(nproc)
+            
+            # If EC2 instance has more resources, you can manually cap container resources below
+            # Set MAX_CONTAINER_MEM_MB via GitHub Secret to limit container to a specific amount
+            # Example: Set MAX_CONTAINER_MEM_MB=512 in GitHub Secrets to cap at 512MB even if server has 4GB available
+            MAX_CONTAINER_MEM_MB="${{ secrets.MAX_CONTAINER_MEM_MB }}"
+            
+            echo "System info:"
+            echo "  Total memory: ${TOTAL_MEM_MB} MB"
+            echo "  Available memory: ${AVAILABLE_MEM_MB} MB"
+            echo "  CPUs: ${CPU_COUNT}"
             
             # Check if there are other containers running
             OTHER_CONTAINERS=$(sudo docker ps --format "{{.Names}}" | grep -v "${{ env.CONTAINER_NAME }}" | wc -l)
@@ -113,7 +124,11 @@ jobs:
             CONTAINER_MEM_MB=$((AVAILABLE_MEM_MB * MEMORY_PERCENT / 100))
             
             # Cap at 512MB max on constrained servers, 1GB if plenty of resources
-            if [ $AVAILABLE_MEM_MB -lt 1500 ]; then
+            # Or use MAX_CONTAINER_MEM_MB if explicitly set (for larger instances)
+            if [ -n "$MAX_CONTAINER_MEM_MB" ]; then
+              echo "Using manually configured max container memory: ${MAX_CONTAINER_MEM_MB}MB"
+              MAX_MEM=$MAX_CONTAINER_MEM_MB
+            elif [ $AVAILABLE_MEM_MB -lt 1500 ]; then
               MAX_MEM=512
             else
               MAX_MEM=1024
@@ -124,20 +139,27 @@ jobs:
             fi
             
             # Adjust minimum based on available resources
-            # For extremely constrained servers, use absolute minimum
+            # For extremely constrained servers, we need at least 256MB to avoid segmentation faults
+            # Segmentation faults typically occur when JVM cannot initialize with too little memory
             if [ $AVAILABLE_MEM_MB -lt 500 ]; then
-              MIN_MEM=128
-              echo "⚠️  Very constrained server - using absolute minimum memory (128MB)"
-              # Force very minimal JVM settings for servers with < 500MB
-              JVM_HEAP_MB=96
+              MIN_MEM=256
+              echo "⚠️  Very constrained server - using minimum viable memory (256MB) to avoid segmentation faults"
+              # Minimum viable heap to avoid crashes during initialization
+              JVM_HEAP_MB=128
             elif [ $AVAILABLE_MEM_MB -lt 800 ]; then
-              MIN_MEM=192
+              MIN_MEM=256
               # If calculated heap is too small, use minimum viable
-              if [ $JVM_HEAP_MB -lt 96 ]; then
-                JVM_HEAP_MB=96
+              if [ $JVM_HEAP_MB -lt 128 ]; then
+                JVM_HEAP_MB=128
               fi
             else
               MIN_MEM=256
+            fi
+            
+            # Ensure heap is at least 128MB (required for JVM initialization)
+            if [ $JVM_HEAP_MB -lt 128 ]; then
+              echo "⚠️  Heap too small, adjusting to minimum viable: 128MB"
+              JVM_HEAP_MB=128
             fi
             
             if [ $CONTAINER_MEM_MB -lt $MIN_MEM ]; then
@@ -165,6 +187,9 @@ jobs:
             echo "  Memory: ${CONTAINER_MEM_MB}MB"
             echo "  CPU: ${CPU_LIMIT} cores"
             echo "  JVM Heap: ${JVM_HEAP_MB}MB"
+            if [ -n "$MAX_CONTAINER_MEM_MB" ]; then
+              echo "  ⚠️  Manually limited to ${MAX_CONTAINER_MEM_MB}MB (server has more resources available)"
+            fi
             echo ""
             
             echo "Starting new container with calculated resources..."
@@ -180,10 +205,12 @@ jobs:
               --ulimit nofile=65536:65536 \
               --ulimit memlock=-1:-1 \
               --ulimit stack=8192:8192 \
+              --shm-size=256m \
               -p 8080:8080 \
               -e SPRING_PROFILES_ACTIVE=production \
               -e SERVER_PORT=8080 \
-              -e JAVA_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m -XX:MaxMetaspaceSize=96m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss128k -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:+DisableAttachMechanism -Dspring.jmx.enabled=false" \
+              -e JAVA_OPTS="-Xms${JVM_HEAP_MB}m -Xmx${JVM_HEAP_MB}m -XX:MaxMetaspaceSize=96m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss128k -XX:ThreadStackSize=128 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:+ExitOnOutOfMemoryError -XX:+CrashOnOutOfMemoryError -XX:ErrorFile=/app/hs_err_pid%p.log -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dspring.main.lazy-initialization=true" \
+              --user root \
               -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
               -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
               -e AI_PROVIDER_ACTIVE=gemini \

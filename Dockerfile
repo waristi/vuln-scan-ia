@@ -38,8 +38,8 @@ COPY --from=build /app/build/libs/*.jar app.jar
 # Cambiar propiedad del archivo y directorio al usuario spring
 RUN chown -R spring:spring /app
 
-# Comentar temporalmente USER para ejecutar como root si hay problemas de permisos
-# En producción, deberías usar un usuario no-root después de resolver problemas de recursos
+# Ejecutar como root para evitar problemas de permisos en servidores con recursos limitados
+# En producción con más recursos, puede usar: USER spring:spring
 # USER spring:spring
 
 # Exponer puerto
@@ -49,7 +49,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# Ejecutar aplicación con Serial GC (no necesita threads de GC) para servidores muy limitados
-# Ejecutando como root temporalmente para evitar problemas de permisos en servidores con recursos muy limitados
-# Agregado manejo de errores y logging para diagnosticar crashes
-ENTRYPOINT ["sh", "-c", "echo 'Starting Java application...' && java ${JAVA_OPTS:--Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss256k -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:+ExitOnOutOfMemoryError -XX:+CrashOnOutOfMemoryError -XX:ErrorFile=/app/hs_err_pid%p.log} -jar app.jar || (echo 'Java process exited with code: $?' && sleep 5 && exit 1)"]
+# Ejecutar aplicación con configuración ultra-mínima para servidores extremadamente limitados
+# Usando Serial GC (single-threaded) y configuración mínima de threads
+ENTRYPOINT ["sh", "-c", "echo 'Starting Java application...' && echo 'JAVA_OPTS: ${JAVA_OPTS}' && java ${JAVA_OPTS:--Xms96m -Xmx192m -XX:MaxMetaspaceSize=96m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss128k -XX:ThreadStackSize=128 -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XX:+ExitOnOutOfMemoryError -XX:+CrashOnOutOfMemoryError -XX:ErrorFile=/app/hs_err_pid%p.log -Djava.security.egd=file:/dev/./urandom -Dspring.jmx.enabled=false -Dspring.main.lazy-initialization=true} -jar app.jar 2>&1 | tee /app/startup.log"]
