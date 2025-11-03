@@ -10,6 +10,9 @@
 > **🚀 Project Status**: ✅ **READY TO USE** - All issues resolved, builds successfully, fully documented.  
 > 📖 See [STATUS_FINAL.md](./STATUS_FINAL.md) for complete status report.
 
+> **🌐 Production API**: The API is live and available at **https://meli-challenge.tingenio.com**  
+> 📚 [API Documentation](https://meli-challenge.tingenio.com/swagger-ui.html) | [Quick Start Guide](#-using-production-api)
+
 ## 📖 Overview
 
 **VulnScan IA** is an intelligent vulnerability assessment system that evaluates the severity of security vulnerabilities (CVEs) in the context of specific applications. It combines **deterministic CVSS scoring** with **AI-powered analysis** to provide accurate, context-aware risk assessments.
@@ -17,7 +20,7 @@
 ### 🎯 Key Features
 
 - ✅ **Context-Aware Scoring**: Adjusts vulnerability severity based on application exposure, data sensitivity, and environment
-- ✅ **AI-Assisted Analysis**: Uses GPT-4 to provide deeper insights and justifications
+- ✅ **AI-Assisted Analysis**: Uses multiple AI providers (Gemini, GPT-4, Claude) to provide deeper insights and justifications
 - ✅ **Deterministic Baseline**: Always maintains a reliable, rule-based score as fallback
 - ✅ **AI Validation**: Prevents "hallucinations" with strict validation rules
 - ✅ **Hexagonal Architecture**: Clean, maintainable, and testable codebase
@@ -92,47 +95,280 @@ src/main/java/com/mercadolibre/vulnscania/
 ### Prerequisites
 
 - **Java 17+**
-- **MongoDB 7.0+**
+- **Docker & Docker Compose** (recommended for local development)
+- **MongoDB 7.0+** (or use Docker Compose)
 - **Gradle 8.x**
-- **OpenAI API Key** (optional, for AI analysis)
+- **AI Provider API Keys** (optional):
+  - Gemini API Key (default provider)
+  - OpenAI API Key (optional)
+  - Claude API Key (optional)
 
-### 1️⃣ Setup MongoDB
+---
 
-```bash
-docker run -d \
-  --name mongodb \
-  -p 27017:27017 \
-  -e MONGO_INITDB_DATABASE=vulnscan \
-  mongo:7.0
-```
+## 💻 Running Locally
 
-### 2️⃣ Configure Application
+### Option 1: Using Docker Compose (Recommended) 🐳
 
-Create `src/main/resources/application-local.properties`:
+The easiest way to run the application locally is using Docker Compose, which sets up all required services automatically.
 
-```properties
-spring.data.mongodb.uri=mongodb://localhost:27017/vulnscan
-openai.api.enabled=true
-openai.api.key=sk-your-api-key-here
-```
+#### Step 1: Configure Environment Variables
 
-### 3️⃣ Run Application
+Create a `.env` file in the project root (optional, for custom configuration):
 
 ```bash
-./gradlew bootRun --args='--spring.profiles.active=local'
+# MongoDB Configuration (defaults are fine for local dev)
+MONGODB_URI=mongodb://admin:admin123@localhost:27018/vulnscan?authSource=admin
+
+# AI Provider Configuration
+AI_PROVIDER_ACTIVE=gemini
+AI_GEMINI_ENABLED=true
+AI_GEMINI_API_KEY=your-gemini-api-key-here
+
+# Optional: OpenAI
+AI_OPENAI_ENABLED=false
+AI_OPENAI_API_KEY=your-openai-api-key-here
+
+# Optional: Claude
+AI_CLAUDE_ENABLED=false
+AI_CLAUDE_API_KEY=your-claude-api-key-here
 ```
 
-### 4️⃣ Access Swagger UI
+#### Step 2: Start Services
 
+```bash
+# Start MongoDB, Mongo Express, and the Application
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Stop services
+docker-compose down
 ```
-http://localhost:8080/swagger-ui
+
+#### Step 3: Access the Application
+
+- **API**: http://localhost:8080
+- **Swagger UI**: http://localhost:8080/swagger-ui.html
+- **Mongo Express** (MongoDB Admin UI): http://localhost:8081
+- **MongoDB**: localhost:27018 (external port)
+
+#### Step 4: Verify Services
+
+```bash
+# Check running containers
+docker-compose ps
+
+# Check application health
+curl http://localhost:8080/actuator/health
+
+# View application logs
+docker-compose logs -f app
 ```
 
 ---
 
-## 📚 Usage Example
+### Option 2: Native Java Execution 🔧
 
-### Register an Application
+#### Step 1: Start MongoDB
+
+```bash
+# Using Docker (recommended)
+docker run -d \
+  --name mongodb \
+  -p 27017:27017 \
+  -e MONGO_INITDB_ROOT_USERNAME=admin \
+  -e MONGO_INITDB_ROOT_PASSWORD=admin123 \
+  -e MONGO_INITDB_DATABASE=vulnscan \
+  mongo:7.0 mongod --auth
+
+# Or install MongoDB locally
+# Follow instructions at: https://www.mongodb.com/docs/manual/installation/
+```
+
+#### Step 2: Configure Application
+
+Create `src/main/resources/application-local.properties`:
+
+```properties
+# Server Configuration
+server.port=8080
+spring.application.name=vuln-scan-ia
+
+# MongoDB Configuration
+spring.data.mongodb.uri=mongodb://admin:admin123@localhost:27017/vulnscan?authSource=admin
+spring.data.mongodb.auto-index-creation=true
+
+# AI Provider Configuration
+ai.provider.active=gemini
+ai.gemini.enabled=true
+ai.gemini.api-key=your-gemini-api-key-here
+ai.gemini.model=gemini-2.5-flash
+
+# Optional: OpenAI
+ai.openai.enabled=false
+ai.openai.api-key=your-openai-api-key-here
+ai.openai.model=gpt-4-turbo-preview
+
+# Optional: Claude
+ai.claude.enabled=false
+ai.claude.api-key=your-claude-api-key-here
+ai.claude.model=claude-3-5-sonnet-20241022
+
+# NVD Configuration
+nvd.api.url=https://services.nvd.nist.gov/rest/json/cves/2.0
+
+# Application Settings
+app.enable-ai-analysis=true
+app.confidence-threshold=0.7
+```
+
+#### Step 3: Run Application
+
+```bash
+# Using Gradle
+./gradlew bootRun --args='--spring.profiles.active=local'
+
+# Or build and run JAR
+./gradlew clean build
+java -jar build/libs/vuln-scan-ia-0.0.1-SNAPSHOT.jar --spring.profiles.active=local
+```
+
+#### Step 4: Access Swagger UI
+
+```
+http://localhost:8080/swagger-ui.html
+```
+
+---
+
+## 🌐 Using Production API
+
+The API is available in production at: **https://meli-challenge.tingenio.com**
+
+### Base URL
+
+```
+https://meli-challenge.tingenio.com
+```
+
+### API Documentation
+
+- **Swagger UI**: https://meli-challenge.tingenio.com/swagger-ui.html
+- **OpenAPI JSON**: https://meli-challenge.tingenio.com/v3/api-docs
+
+### Authentication
+
+The production API uses JWT authentication. You need to register a user and obtain an access token.
+
+#### Step 1: Register a User
+
+```bash
+curl -X POST https://meli-challenge.tingenio.com/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "myuser",
+    "email": "user@example.com",
+    "password": "SecurePassword123!",
+    "roles": ["USER"]
+  }'
+```
+
+#### Step 2: Login and Get Token
+
+```bash
+curl -X POST https://meli-challenge.tingenio.com/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "myuser",
+    "password": "SecurePassword123!"
+  }'
+```
+
+**Response:**
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "expiresIn": 3600,
+  "tokenType": "Bearer"
+}
+```
+
+#### Step 3: Use Token in API Calls
+
+```bash
+# Store token in variable
+TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+# Use token in Authorization header
+curl -X GET https://meli-challenge.tingenio.com/api/v1/applications \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Example: Complete Workflow in Production
+
+```bash
+# 1. Register an Application
+curl -X POST https://meli-challenge.tingenio.com/api/v1/applications \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "payment-service",
+    "techStack": ["Java 17", "Spring Boot 3.2"],
+    "dependencies": [
+      {
+        "name": "org.springframework.boot:spring-boot-starter-web",
+        "version": "3.2.0",
+        "ecosystem": "maven"
+      }
+    ],
+    "internetExposed": true,
+    "dataSensitivity": "HIGHLY_REGULATED",
+    "runtimeEnvironments": ["prod"]
+  }'
+
+# 2. Evaluate a Vulnerability
+curl -X POST https://meli-challenge.tingenio.com/api/v1/vulnerabilities/evaluate \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cveId": "CVE-2021-44228",
+    "applicationId": "app-550e8400-e29b-41d4-a716-446655440000",
+    "useAIAnalysis": true,
+    "aiProvider": "gemini"
+  }'
+
+# 3. Get Vulnerability Status
+curl -X GET "https://meli-challenge.tingenio.com/api/v1/vulnerabilities/status?applicationId=app-550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Health Check
+
+```bash
+curl https://meli-challenge.tingenio.com/actuator/health
+```
+
+### Refresh Token
+
+When your access token expires, use the refresh token to get a new one:
+
+```bash
+curl -X POST https://meli-challenge.tingenio.com/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+```
+
+---
+
+## 📚 Usage Examples
+
+### Local Development Examples
+
+#### 1. Register an Application
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/applications \
@@ -153,7 +389,7 @@ curl -X POST http://localhost:8080/api/v1/applications \
   }'
 ```
 
-### Evaluate a Vulnerability
+#### 2. Evaluate a Vulnerability
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/vulnerabilities/evaluate \
@@ -161,7 +397,8 @@ curl -X POST http://localhost:8080/api/v1/vulnerabilities/evaluate \
   -d '{
     "cveId": "CVE-2021-44228",
     "applicationId": "app-550e8400-e29b-41d4-a716-446655440000",
-    "useAIAnalysis": true
+    "useAIAnalysis": true,
+    "aiProvider": "gemini"
   }'
 ```
 
@@ -177,6 +414,18 @@ curl -X POST http://localhost:8080/api/v1/vulnerabilities/evaluate \
   "responseSlaHours": 12
 }
 ```
+
+#### 3. Get Vulnerability Status
+
+```bash
+curl -X GET "http://localhost:8080/api/v1/vulnerabilities/status?applicationId=app-550e8400-e29b-41d4-a716-446655440000"
+```
+
+### Production API Examples
+
+All examples use the base URL: **https://meli-challenge.tingenio.com**
+
+See the [Using Production API](#-using-production-api) section above for complete examples with authentication.
 
 ---
 
@@ -266,7 +515,7 @@ Base CVSS Score (from NVD)
 ### Current
 
 - ✅ **NVD API**: Real-time CVE data
-- ✅ **OpenAI GPT-4**: AI-powered analysis
+- ✅ **Multiple AI Providers**: Gemini (default), OpenAI GPT-4, Claude 3.5 Sonnet
 - ✅ **MongoDB**: Persistence
 - ✅ **Spring Events**: Internal event bus
 
@@ -300,7 +549,9 @@ Base CVSS Score (from NVD)
 - **OpenAPI 3.0** (Springdoc)
 - **Jackson** (JSON processing)
 - **SLF4J + Logback** (Logging)
-- **OpenAI SDK**
+- **OpenAI SDK** (GPT-4)
+- **Anthropic SDK** (Claude)
+- **Google GenAI SDK** (Gemini)
 
 ---
 
@@ -358,7 +609,7 @@ Base CVSS Score (from NVD)
 - [x] Basic evaluation flow
 
 ### Phase 2: Enhancements 🚧
-- [ ] Claude & Gemini adapters
+- [x] Claude & Gemini adapters ✅
 - [ ] Slack notifications
 - [ ] GitHub Actions integration
 - [ ] Prometheus metrics
