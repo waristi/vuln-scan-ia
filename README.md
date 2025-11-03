@@ -7,8 +7,6 @@
 [![Build](https://img.shields.io/badge/Build-Passing-brightgreen.svg)](./STATUS_FINAL.md)
 [![Status](https://img.shields.io/badge/Status-Ready-success.svg)](./STATUS_FINAL.md)
 
-> **🚀 Project Status**: ✅ **READY TO USE** - All issues resolved, builds successfully, fully documented.  
-> 📖 See [STATUS_FINAL.md](./STATUS_FINAL.md) for complete status report.
 
 > **🌐 Production API**: The API is live and available at **https://meli-challenge.tingenio.com**  
 > 📚 [API Documentation](https://meli-challenge.tingenio.com/swagger-ui.html) | [Quick Start Guide](#-using-production-api)
@@ -36,6 +34,15 @@
 
 This project follows **Hexagonal Architecture (Ports & Adapters)** with **Domain-Driven Design** principles.
 
+> 📖 **📐 [Complete Architecture Documentation →](docs/ARQUITECTURA.md)**  
+> Detailed specifications with C4 model diagrams, component descriptions, data flows, and technical decisions.
+
+### Hexagonal Architecture Diagram
+
+![Hexagonal Architecture](docs/diagrams/hexagonal-architecture.png)
+
+### Layer Structure
+
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                    PRESENTATION LAYER                      │
@@ -58,6 +65,16 @@ This project follows **Hexagonal Architecture (Ports & Adapters)** with **Domain
 │  (MongoDB, NVD API, OpenAI, Event Publisher, Configs)      │
 └────────────────────────────────────────────────────────────┘
 ```
+
+**Key Principles:**
+- **Domain Layer**: Pure business logic, zero framework dependencies
+- **Application Layer**: Orchestrates use cases, framework-independent  
+- **Infrastructure Layer**: Implements ports, contains all framework-specific code
+- **Dependency Direction**: Infrastructure → Application → Domain (dependencies point inward)
+
+For detailed architecture documentation including C4 model diagrams (Context, Container, Component, Code), data flows, technical decisions, and deployment architecture, see the **[Complete Architecture Documentation](docs/ARQUITECTURA.md)**.
+
+---
 
 ### 📦 Project Structure
 
@@ -531,6 +548,8 @@ Base CVSS Score (from NVD)
 
 ## 📖 Documentation
 
+- **[📐 Architecture Documentation](docs/ARQUITECTURA.md)** - Complete architecture specifications with C4 model diagrams
+- **[📚 Architecture Index](docs/INDICE_ARQUITECTURA.md)** - Guide to all architecture documentation and diagrams
 - [`USAGE_GUIDE.md`](USAGE_GUIDE.md) - Complete usage guide with examples
 - [`API_EXAMPLES.http`](API_EXAMPLES.http) - REST Client examples
 - [`DOMAIN_README.md`](src/main/java/com/mercadolibre/vulnscania/domain/DOMAIN_README.md) - Domain layer details

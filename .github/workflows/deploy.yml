@@ -78,27 +78,17 @@ jobs:
             sudo docker rmi ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }} || true
             
             echo "Pulling latest image..."
-            # Detect architecture and pull appropriate platform
+            # Docker will automatically select the correct platform from multi-arch manifest
+            # No need for --platform flag if experimental features are not enabled
             ARCH=$(uname -m)
-            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-              echo "Detected ARM64 architecture, pulling linux/arm64 image..."
-              sudo docker pull --platform linux/arm64 ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
-            else
-              echo "Detected AMD64/x86_64 architecture, pulling linux/amd64 image..."
-              sudo docker pull --platform linux/amd64 ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
-            fi
+            echo "Server architecture: $ARCH"
+            echo "Pulling image (Docker will auto-select matching platform)..."
+            sudo docker pull ${{ env.DOCKER_IMAGE }}:${{ env.IMAGE_TAG }}
             
             echo "Starting new container..."
-            # Detect architecture for platform flag
-            ARCH=$(uname -m)
-            if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-              PLATFORM_FLAG="--platform linux/arm64"
-            else
-              PLATFORM_FLAG="--platform linux/amd64"
-            fi
-            
+            # Docker will use the image matching the host architecture automatically
+            # No need for --platform flag if experimental features are not enabled
             CONTAINER_ID=$(sudo docker run -d \
-              $PLATFORM_FLAG \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
               -p 8182:8080 \
