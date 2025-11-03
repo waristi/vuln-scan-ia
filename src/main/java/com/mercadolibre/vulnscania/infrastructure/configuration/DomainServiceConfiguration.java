@@ -72,7 +72,7 @@ public class DomainServiceConfiguration {
             ApplicationRepository applicationRepository,
             VulnerabilityRepository vulnerabilityRepository,
             AssessmentRepository assessmentRepository,
-            AIAnalysisPort aiAnalysisPort,
+            com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIProviderSelector aiProviderSelector,
             AIAssessmentValidationService validationService,
             DomainEventPublisher eventPublisher) {
         
@@ -81,7 +81,7 @@ public class DomainServiceConfiguration {
             applicationRepository,
             vulnerabilityRepository,
             assessmentRepository,
-            aiAnalysisPort,
+            aiProviderSelector,
             validationService,
             eventPublisher
         );

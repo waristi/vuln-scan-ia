@@ -13,7 +13,7 @@ import org.springframework.stereotype.Component;
  * TODO: Implement full Claude API integration when API key is available.
  * This is a placeholder that returns fallback results.
  */
-@Component
+@Component("claudeAdapter")
 @ConditionalOnProperty(prefix = "ai.claude", name = "enabled", havingValue = "true")
 public class ClaudeAnalysisAdapter extends AbstractAIAnalysisAdapter implements AIAnalysisPort {
     

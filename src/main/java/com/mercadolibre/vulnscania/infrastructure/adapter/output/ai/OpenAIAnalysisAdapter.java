@@ -24,7 +24,7 @@ import java.util.Map;
  * 
  * Enabled only when ai.openai.enabled=true in configuration.
  */
-@Component
+@Component("openaiAdapter")
 @ConditionalOnProperty(prefix = "ai.openai", name = "enabled", havingValue = "true")
 public class OpenAIAnalysisAdapter extends AbstractAIAnalysisAdapter implements AIAnalysisPort {
     
