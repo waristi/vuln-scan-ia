@@ -18,18 +18,39 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
+import static com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants.*;
+
 /**
  * Google Gemini adapter implementing AIAnalysisPort.
- * Uses Gemini Pro for vulnerability analysis.
  * 
- * Enabled only when ai.gemini.enabled=true in configuration.
+ * <p>Uses Gemini 2.5 Flash model for vulnerability analysis with structured JSON responses.
+ * This adapter handles Gemini-specific API format, including:</p>
+ * <ul>
+ *   <li>API key passed as URL query parameter (not header)</li>
+ *   <li>Response structure with candidates[].content.parts[].text</li>
+ *   <li>JSON wrapped in markdown code blocks</li>
+ *   <li>Internal "thoughts" tokens counting towards maxOutputTokens</li>
+ * </ul>
+ * 
+ * <p><strong>Configuration</strong>: Enabled only when {@code ai.gemini.enabled=true}.</p>
+ * 
+ * <p><strong>Gemini 2.5 Flash Characteristics</strong>:</p>
+ * <ul>
+ *   <li>Uses ~500-1000 tokens for internal reasoning ("thoughts")</li>
+ *   <li>Requires higher maxOutputTokens than previous models</li>
+ *   <li>May return finishReason="MAX_TOKENS" if limit is too low</li>
+ * </ul>
+ * 
+ * @see AIAnalysisPort
+ * @see AbstractAIAnalysisAdapter
+ * @see AIAnalysisConstants
  */
 @Component("geminiAdapter")
 @ConditionalOnProperty(prefix = "ai.gemini", name = "enabled", havingValue = "true")
 public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements AIAnalysisPort {
     
-    private static final String PROVIDER = "Google Gemini Pro";
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
+    private static final String PROVIDER = "Google Gemini 2.5 Flash";
+    private static final Duration TIMEOUT = Duration.ofSeconds(GEMINI_TIMEOUT_SECONDS);
     
     private final WebClient webClient;
     private final String model;
@@ -87,10 +108,10 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
                 )
             ),
             "generationConfig", Map.of(
-                "temperature", 0.3,
-                "maxOutputTokens", 2048,  // Aumentado para gemini-2.5-flash
-                "topP", 0.8,
-                "topK", 40
+                "temperature", GEMINI_TEMPERATURE,
+                "maxOutputTokens", GEMINI_MAX_OUTPUT_TOKENS,
+                "topP", GEMINI_TOP_P,
+                "topK", GEMINI_TOP_K
             )
         );
         
@@ -189,7 +210,7 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
         
         double score = analysisJson.path("score").asDouble();
         String justification = analysisJson.path("justification").asText();
-        double confidence = analysisJson.path("confidence").asDouble(0.7);
+        double confidence = analysisJson.path("confidence").asDouble(DEFAULT_HIGH_CONFIDENCE);
         
         if (!isValidScore(score)) {
             log.warn("Invalid score from Gemini: {}, clamping to valid range", score);
@@ -201,8 +222,9 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
         }
         
         if (!isValidConfidence(confidence)) {
-            log.warn("Invalid confidence from Gemini: {}, defaulting to 0.7", confidence);
-            confidence = 0.7;
+            log.warn("Invalid confidence from Gemini: {}, defaulting to {}", 
+                confidence, DEFAULT_HIGH_CONFIDENCE);
+            confidence = DEFAULT_HIGH_CONFIDENCE;
         }
         
         return new AIAnalysisResult(
@@ -215,17 +237,33 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
     
     /**
      * Extracts JSON from markdown code blocks.
-     * Gemini sometimes wraps JSON in ```json ... ```
+     * 
+     * <p>Gemini often wraps JSON responses in markdown code blocks:</p>
+     * <pre>
+     * ```json
+     * {"score": 8.5, "justification": "...", "confidence": 0.85}
+     * ```
+     * </pre>
+     * 
+     * <p>This method handles three cases:</p>
+     * <ol>
+     *   <li>JSON wrapped in ```json ... ```</li>
+     *   <li>JSON wrapped in ``` ... ``` (no language marker)</li>
+     *   <li>Plain JSON (no wrapping)</li>
+     * </ol>
+     * 
+     * @param text raw text response from Gemini
+     * @return extracted JSON string
      */
     private String extractJsonFromMarkdown(String text) {
         if (text.contains("```json")) {
-            int start = text.indexOf("```json") + 7;
+            int start = text.indexOf("```json") + JSON_MARKER_LENGTH;
             int end = text.indexOf("```", start);
             if (end > start) {
                 return text.substring(start, end).trim();
             }
         } else if (text.contains("```")) {
-            int start = text.indexOf("```") + 3;
+            int start = text.indexOf("```") + CODE_BLOCK_MARKER_LENGTH;
             int end = text.indexOf("```", start);
             if (end > start) {
                 return text.substring(start, end).trim();
@@ -236,12 +274,18 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
     
     /**
      * Creates fallback result when AI analysis fails.
+     * 
+     * <p>Returns the base CVSS score with medium confidence (0.5) to indicate
+     * that this is a fallback and not a full AI analysis.</p>
+     * 
+     * @param vulnerability the vulnerability being analyzed
+     * @return fallback analysis result using base score
      */
     private AIAnalysisResult createFallbackResult(Vulnerability vulnerability) {
         return new AIAnalysisResult(
             vulnerability.getBaseScore(),
             "Gemini AI analysis unavailable - using base CVSS score",
-            0.5,
+            DEFAULT_FALLBACK_CONFIDENCE,
             PROVIDER + " (fallback)"
         );
     }

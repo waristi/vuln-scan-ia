@@ -46,6 +46,33 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.CONFLICT, ex);
     }
     
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
+        // Don't log specific credential details to avoid information disclosure
+        log.warn("Invalid credentials provided");
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex);
+    }
+    
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidToken(InvalidTokenException ex) {
+        log.warn("Invalid token: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, ex);
+    }
+    
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+        // Don't log the full message to avoid information disclosure
+        log.warn("Registration attempt with existing username");
+        return buildErrorResponse(HttpStatus.CONFLICT, ex);
+    }
+
+    @ExceptionHandler(com.mercadolibre.vulnscania.domain.exception.WeakPasswordException.class)
+    public ResponseEntity<ErrorResponse> handleWeakPassword(com.mercadolibre.vulnscania.domain.exception.WeakPasswordException ex) {
+        // Don't log password details
+        log.warn("Weak password provided during registration");
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, ex);
+    }
+    
     @ExceptionHandler(InvalidCveIdException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCveId(InvalidCveIdException ex) {
         log.warn("Invalid CVE ID: {}", ex.getProvidedValue());
@@ -105,15 +132,20 @@ public class GlobalExceptionHandler {
     
     /**
      * Handles unexpected errors.
+     *
+     * <p>Security: Does not expose internal error details to clients in production.
+     * Only logs full details server-side for debugging.</p>
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception ex) {
-        log.error("Unexpected error", ex);
+        // Log full error details server-side for debugging
+        log.error("Unexpected error: {}", ex.getClass().getSimpleName(), ex);
         
+        // Don't expose internal error details to clients
         ErrorResponse errorResponse = new ErrorResponse(
             "INTERNAL_ERROR",
-            "An unexpected error occurred",
-            Map.of("message", ex.getMessage() != null ? ex.getMessage() : "Unknown error"),
+            "An unexpected error occurred. Please contact support if the problem persists.",
+            Map.of(), // Don't include error message details
             Instant.now()
         );
         

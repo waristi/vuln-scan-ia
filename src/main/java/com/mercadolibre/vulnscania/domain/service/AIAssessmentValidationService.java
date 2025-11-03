@@ -2,37 +2,62 @@ package com.mercadolibre.vulnscania.domain.service;
 
 import com.mercadolibre.vulnscania.domain.model.vulnerability.SeverityScore;
 
+import static com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants.*;
+
 /**
- * Domain Service: AIAssessmentValidationService
- * Valida y controla los resultados del análisis de IA para prevenir "alucinaciones" y garantizar coherencia.
+ * Domain Service: AI Assessment Validation Service
  * 
- * Reglas de negocio críticas para uso seguro de IA en evaluación de vulnerabilidades.
+ * <p>Validates and controls AI analysis results to prevent "hallucinations" and ensure consistency.
+ * This service implements critical business rules for safe use of AI in vulnerability assessment.</p>
+ * 
+ * <p><strong>Core Responsibilities</strong>:</p>
+ * <ul>
+ *   <li>Validate AI-suggested scores against deterministic baselines</li>
+ *   <li>Prevent AI from making unreasonable adjustments</li>
+ *   <li>Blend AI and baseline scores based on confidence</li>
+ *   <li>Determine when human review is required</li>
+ * </ul>
+ * 
+ * <p><strong>Key Business Rules</strong>:</p>
+ * <ul>
+ *   <li>AI cannot adjust more than ±{@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_AI_ADJUSTMENT} points from baseline</li>
+ *   <li>AI cannot reduce critical scores (>= 9.0)</li>
+ *   <li>AI gets maximum {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_AI_WEIGHT} weight when blending scores</li>
+ *   <li>Low confidence (<{@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_CONFIDENCE_ACCEPTABLE}) triggers rejection</li>
+ *   <li>Large discrepancies (>{@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_DISCREPANCY_FOR_REVIEW}) require human review</li>
+ * </ul>
+ * 
+ * <p>This is a DOMAIN SERVICE because it contains business logic that doesn't naturally
+ * belong to any single entity but coordinates between Vulnerability and AI analysis.</p>
  */
 public class AIAssessmentValidationService {
     
-    private static final double MAX_ALLOWED_ADJUSTMENT = 1.5;
-    private static final double MIN_CONFIDENCE_THRESHOLD = 0.6;
-    
     /**
-     * Valida y ajusta un score sugerido por IA contra el baseline determinista.
+     * Validates and constrains an AI-suggested score against the deterministic baseline.
      * 
-     * Reglas de seguridad:
-     * - IA no puede ajustar más de ±1.5 puntos del baseline
-     * - IA no puede bajar score si baseline es crítico (>= 9.0)
-     * - IA no puede subir más de 2x el baseline
+     * <p><strong>Security Rules Applied</strong>:</p>
+     * <ol>
+     *   <li>AI cannot adjust more than ±{@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_AI_ADJUSTMENT} points from baseline</li>
+     *   <li>AI cannot lower score if baseline is critical (>= 9.0)</li>
+     *   <li>AI cannot raise more than {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_SCORE_MULTIPLIER}x the baseline (prevents "panic scoring")</li>
+     *   <li>Final score is clamped to valid CVSS range [0.0, 10.0]</li>
+     * </ol>
      * 
-     * @param aiSuggestedScore Score sugerido por IA
-     * @param baselineScore Score calculado determinísticamente
-     * @return Score validado y ajustado si es necesario
+     * <p><strong>Rationale</strong>: These constraints prevent AI "hallucinations" from producing
+     * unreasonable scores while still allowing AI to refine the deterministic assessment.</p>
+     * 
+     * @param aiSuggestedScore AI-suggested score
+     * @param baselineScore deterministically calculated baseline score
+     * @return validated and constrained score
      */
     public SeverityScore validateAndConstrainScore(SeverityScore aiSuggestedScore, 
                                                     SeverityScore baselineScore) {
         double ai = aiSuggestedScore.value();
         double baseline = baselineScore.value();
         
-        // Regla 1: No permitir ajustes mayores a ±1.5
-        double maxAllowed = baseline + MAX_ALLOWED_ADJUSTMENT;
-        double minAllowed = baseline - MAX_ALLOWED_ADJUSTMENT;
+        // Rule 1: Do not allow adjustments greater than ±MAX_AI_ADJUSTMENT
+        double maxAllowed = baseline + MAX_AI_ADJUSTMENT;
+        double minAllowed = baseline - MAX_AI_ADJUSTMENT;
         
         if (ai > maxAllowed) {
             ai = maxAllowed;
@@ -40,64 +65,72 @@ public class AIAssessmentValidationService {
             ai = minAllowed;
         }
         
-        // Regla 2: No bajar score si baseline es crítico
+        // Rule 2: Do not lower score if baseline is critical
         if (baselineScore.isCritical() && ai < baseline) {
             ai = baseline;
         }
         
-        // Regla 3: No subir más de 2x el baseline (prevenir "panic scoring")
-        double maxDouble = baseline * 2.0;
+        // Rule 3: Do not raise more than MAX_SCORE_MULTIPLIER x baseline (prevent "panic scoring")
+        double maxDouble = baseline * MAX_SCORE_MULTIPLIER;
         if (ai > maxDouble) {
             ai = maxDouble;
         }
         
-        // Clamp al rango válido
+        // Clamp to valid CVSS range
         ai = Math.min(SeverityScore.MAX_SCORE, Math.max(SeverityScore.MIN_SCORE, ai));
         
         return new SeverityScore(ai);
     }
     
     /**
-     * Determina si el análisis de IA es confiable basado en el nivel de confianza reportado.
+     * Determines if AI analysis is reliable based on reported confidence level.
      * 
-     * @param confidenceLevel Nivel de confianza (0.0 - 1.0)
-     * @return true si es confiable (>= 0.6)
+     * <p>Minimum acceptable confidence is {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_CONFIDENCE_ACCEPTABLE}.
+     * Below this threshold, the AI analysis is considered unreliable and will be rejected.</p>
+     * 
+     * @param confidenceLevel confidence level (0.0 - 1.0)
+     * @return true if confidence is acceptable (>= {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_CONFIDENCE_ACCEPTABLE})
      */
     public boolean isConfidenceAcceptable(double confidenceLevel) {
-        return confidenceLevel >= MIN_CONFIDENCE_THRESHOLD;
+        return confidenceLevel >= MIN_CONFIDENCE_ACCEPTABLE;
     }
     
     /**
-     * Determina si el análisis de IA debe ser rechazado y usar solo baseline.
+     * Determines if AI analysis should be rejected and use only baseline scoring.
      * 
-     * Reglas:
-     * - Confianza < 0.6
-     * - Ajuste sugerido muy grande (> 3.0 puntos)
-     * - Justificación vacía o muy corta (< 50 caracteres)
+     * <p><strong>Rejection Criteria</strong>:</p>
+     * <ul>
+     *   <li>Confidence < {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_CONFIDENCE_ACCEPTABLE} (unreliable)</li>
+     *   <li>Suggested adjustment > {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_ADJUSTMENT_BEFORE_REJECTION} points (potential hallucination)</li>
+     *   <li>Justification empty or too short (< {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#FALLBACK_MIN_JUSTIFICATION_LENGTH} characters)</li>
+     * </ul>
      * 
-     * @param aiScore Score de IA
-     * @param baselineScore Score baseline
-     * @param confidenceLevel Confianza
-     * @param justification Justificación del IA
-     * @return true si debe rechazarse
+     * <p><strong>Rationale</strong>: These checks protect against low-quality AI outputs that
+     * could mislead security analysis.</p>
+     * 
+     * @param aiScore AI-suggested score
+     * @param baselineScore deterministic baseline score
+     * @param confidenceLevel confidence level (0.0 - 1.0)
+     * @param justification AI's justification text
+     * @return true if analysis should be rejected
      */
     public boolean shouldRejectAIAnalysis(SeverityScore aiScore,
                                          SeverityScore baselineScore,
                                          double confidenceLevel,
                                          String justification) {
-        // Confianza muy baja
-        if (confidenceLevel < MIN_CONFIDENCE_THRESHOLD) {
+        // Very low confidence
+        if (confidenceLevel < MIN_CONFIDENCE_ACCEPTABLE) {
             return true;
         }
         
-        // Ajuste demasiado grande (potencial alucinación)
+        // Adjustment too large (potential hallucination)
         double adjustment = Math.abs(aiScore.value() - baselineScore.value());
-        if (adjustment > 3.0) {
+        if (adjustment > MAX_ADJUSTMENT_BEFORE_REJECTION) {
             return true;
         }
         
-        // Justificación insuficiente
-        if (justification == null || justification.length() < 50) {
+        // Insufficient justification
+        if (justification == null || justification.length() < FALLBACK_MIN_JUSTIFICATION_LENGTH) {
             return true;
         }
         
@@ -105,22 +138,34 @@ public class AIAssessmentValidationService {
     }
     
     /**
-     * Combina el score de IA con el baseline usando un peso basado en confianza.
+     * Blends AI score with baseline using confidence-based weighting.
      * 
-     * Regla: Score final = (baseline * (1 - weight)) + (aiScore * weight)
-     * Donde weight está determinado por el nivel de confianza.
+     * <p><strong>Blending Formula</strong>:</p>
+     * <pre>
+     * finalScore = (baseline * (1 - aiWeight)) + (aiScore * aiWeight)
      * 
-     * @param aiScore Score de IA
-     * @param baselineScore Score baseline
-     * @param confidenceLevel Nivel de confianza (0.0 - 1.0)
-     * @return Score combinado ponderado
+     * where:
+     *   aiWeight = min(confidence, {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_AI_WEIGHT})
+     * </pre>
+     * 
+     * <p><strong>Rationale</strong>:</p>
+     * <ul>
+     *   <li>Low confidence: more weight to baseline (safer, deterministic)</li>
+     *   <li>High confidence: more weight to AI (better contextual understanding)</li>
+     *   <li>Maximum AI weight is {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MAX_AI_WEIGHT}: baseline always has >=30% influence</li>
+     * </ul>
+     * 
+     * @param aiScore AI-suggested score
+     * @param baselineScore deterministic baseline score
+     * @param confidenceLevel confidence level (0.0 - 1.0)
+     * @return blended score weighted by confidence
      */
     public SeverityScore blendScores(SeverityScore aiScore,
                                      SeverityScore baselineScore,
                                      double confidenceLevel) {
-        // Confianza baja: más peso al baseline
-        // Confianza alta: más peso al IA
-        double aiWeight = Math.min(0.7, confidenceLevel); // Máximo 70% de peso a IA
+        // Low confidence: more weight to baseline
+        // High confidence: more weight to AI
+        double aiWeight = Math.min(MAX_AI_WEIGHT, confidenceLevel); // Maximum MAX_AI_WEIGHT% weight to AI
         double baselineWeight = 1.0 - aiWeight;
         
         double blended = (baselineScore.value() * baselineWeight) + 
@@ -130,40 +175,46 @@ public class AIAssessmentValidationService {
     }
     
     /**
-     * Determina si el análisis requiere revisión humana.
+     * Determines if the analysis requires human review.
      * 
-     * Requiere revisión si:
-     * - Confianza < 0.7
-     * - Score final es crítico (>= 9.0)
-     * - Discrepancia grande entre IA y baseline (> 2.0)
+     * <p><strong>Review is Required When</strong>:</p>
+     * <ul>
+     *   <li>Confidence < {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_CONFIDENCE_FOR_NO_REVIEW} (moderate-low confidence)</li>
+     *   <li>Final score is critical (>= 9.0) - always requires expert confirmation</li>
+     *   <li>Large discrepancy between AI and baseline (> {@value com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants#MIN_DISCREPANCY_FOR_REVIEW} points)</li>
+     * </ul>
      * 
-     * @param finalScore Score final
-     * @param aiScore Score de IA
-     * @param baselineScore Score baseline
-     * @param confidenceLevel Confianza
-     * @return true si requiere revisión
+     * <p><strong>Rationale</strong>: Human review provides a safety net for high-stakes decisions
+     * and cases where AI and deterministic models significantly disagree.</p>
+     * 
+     * @param finalScore final blended score
+     * @param aiScore AI-suggested score
+     * @param baselineScore deterministic baseline score
+     * @param confidenceLevel confidence level (0.0 - 1.0)
+     * @return true if human review is required
      */
     public boolean requiresHumanReview(SeverityScore finalScore,
                                       SeverityScore aiScore,
                                       SeverityScore baselineScore,
                                       double confidenceLevel) {
-        // Confianza moderada-baja
-        if (confidenceLevel < 0.7) {
+        // Moderate-low confidence
+        if (confidenceLevel < MIN_CONFIDENCE_FOR_NO_REVIEW) {
             return true;
         }
         
-        // Score crítico siempre requiere confirmación
+        // Critical score always requires confirmation
         if (finalScore.isCritical()) {
             return true;
         }
         
-        // Gran discrepancia entre IA y baseline
+        // Large discrepancy between AI and baseline
         double discrepancy = Math.abs(aiScore.value() - baselineScore.value());
-        if (discrepancy > 2.0) {
+        if (discrepancy > MIN_DISCREPANCY_FOR_REVIEW) {
             return true;
         }
         
         return false;
     }
 }
+
 

@@ -5,14 +5,28 @@ import com.mercadolibre.vulnscania.domain.model.vulnerability.Vulnerability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIAnalysisConstants.*;
+
 /**
  * Abstract base class for AI analysis adapters.
- * Implements common functionality for prompt building and error handling.
  * 
- * Clean code principles:
- * - DRY: Common prompt logic shared across providers
- * - Template Method pattern: subclasses implement providerSpecificAnalysis()
- * - Single Responsibility: prompt building separated from API communication
+ * <p>Implements common functionality shared across all AI providers:</p>
+ * <ul>
+ *   <li><strong>Prompt Building</strong>: Standard format for vulnerability analysis requests</li>
+ *   <li><strong>Response Validation</strong>: Score, justification, and confidence validation</li>
+ *   <li><strong>Error Handling</strong>: Common error handling patterns</li>
+ * </ul>
+ * 
+ * <p><strong>Design Patterns Applied</strong>:</p>
+ * <ul>
+ *   <li><strong>Template Method</strong>: Subclasses implement provider-specific API calls</li>
+ *   <li><strong>DRY</strong>: Common prompt logic shared across all providers</li>
+ *   <li><strong>Single Responsibility</strong>: Prompt building separated from API communication</li>
+ * </ul>
+ * 
+ * @see GeminiAnalysisAdapter
+ * @see OpenAIAnalysisAdapter
+ * @see ClaudeAnalysisAdapter
  */
 public abstract class AbstractAIAnalysisAdapter {
     
@@ -85,7 +99,10 @@ public abstract class AbstractAIAnalysisAdapter {
     }
     
     /**
-     * Validates AI response score is within acceptable range.
+     * Validates AI response score is within acceptable CVSS range [0.0, 10.0].
+     * 
+     * @param score the score to validate
+     * @return true if score is valid
      */
     protected boolean isValidScore(double score) {
         return score >= 0.0 && score <= 10.0;
@@ -93,18 +110,28 @@ public abstract class AbstractAIAnalysisAdapter {
     
     /**
      * Validates justification is not empty and meets minimum length.
+     * 
+     * <p>Minimum length of {@value AIAnalysisConstants#MIN_JUSTIFICATION_LENGTH} characters ensures
+     * the justification is detailed enough to be useful for security analysts.</p>
+     * 
+     * @param justification the justification text to validate
+     * @return true if justification is valid and long enough
      */
     protected boolean isValidJustification(String justification) {
         return justification != null && 
                !justification.isBlank() && 
-               justification.length() >= 50;
+               justification.length() >= MIN_JUSTIFICATION_LENGTH;
     }
     
     /**
-     * Validates confidence is within acceptable range.
+     * Validates confidence level is within acceptable range [0.0, 1.0].
+     * 
+     * @param confidence the confidence level to validate
+     * @return true if confidence is valid
      */
     protected boolean isValidConfidence(double confidence) {
         return confidence >= 0.0 && confidence <= 1.0;
     }
 }
+
 

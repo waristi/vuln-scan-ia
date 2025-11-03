@@ -1,15 +1,42 @@
-.gradle/
-build/
-bin/
-.git/
+# Git
+.git
 .gitignore
+.github
+
+# Documentation
+docs
 *.md
+*.pdf
+
+# IDE
+.idea
+.vscode
 *.iml
-.idea/
-.vscode/
-node_modules/
-.env
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+.gradle/
+bin/
+out/
+target/
+
+# Logs
 *.log
-docker-compose.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+src/test/
+
+# Docker
 Dockerfile
+.dockerignore
+docker-compose.yml
+
+# CI/CD
 .github/

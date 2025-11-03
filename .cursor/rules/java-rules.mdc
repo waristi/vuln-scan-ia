@@ -1,0 +1,82 @@
+---
+alwaysApply: true
+---
+# Java Development Rules
+
+## Code Style & Documentation
+
+1. **Do not comment every line you create**
+   - Avoid unnecessary comments on self-explanatory code
+   - Only comment when the code requires explanation of "why", not "what"
+   - Code should be readable without comments
+
+2. **Document everything with JavaDoc**
+   - All classes, interfaces, public methods, and constructors must have JavaDoc
+   - JavaDoc should explain WHAT it does, WHY it exists, and WHAT parameters/values it expects
+   - Use `@param`, `@return`, `@throws` when appropriate
+   - For complex classes, include usage examples when useful
+   - Keep JavaDoc in English
+
+## Architecture Principles
+
+3. **Always maintain hexagonal architecture principles**
+   - Domain layer: MUST NOT know about infrastructure or frameworks (Spring, MongoDB, etc.)
+   - Application layer: Orchestrates use cases, MUST NOT know infrastructure details
+   - Infrastructure layer: Implements ports, contains technology-specific adapters
+   - Dependencies point inward: Infrastructure → Application → Domain
+   - Use Ports (interfaces) in domain/application, implementations in infrastructure
+   - DO NOT use framework annotations (Spring) in domain or application layers
+   - Transaction management only in infrastructure layer (controllers)
+
+## SOLID Principles
+
+4. **Do not break SOLID, DRY, YAGNI principles**
+
+### SOLID
+- **S**ingle Responsibility: Each class/method must have ONE responsibility
+- **O**pen/Closed: Open for extension, closed for modification
+- **L**iskov Substitution: Subtypes must be substitutable for their base types
+- **I**nterface Segregation: Small, specific interfaces, not generic ones
+- **D**ependency Inversion: Depend on abstractions (ports), not concrete implementations
+
+### DRY (Don't Repeat Yourself)
+- DO NOT duplicate business logic
+- Extract magic constants to constant classes
+- Reuse common code in shared methods/utilities
+- Use inheritance/composition to avoid duplication
+
+### YAGNI (You Aren't Gonna Need It)
+- DO NOT implement functionality "just in case"
+- Implement only what is needed now
+- Avoid over-engineering and premature abstractions
+- Keep code simple until complexity is needed
+
+## Additional Guidelines
+
+### Value Objects & Entities
+- Use Value Objects (Records) for immutable concepts without identity (IDs, scores, etc.)
+- Use Entities (Classes) for concepts with identity and mutable state
+- Value Objects must be immutable (final fields, no setters)
+- Validations should be in Value Object constructors
+
+### Commands & Queries
+- Use Command Pattern for operations that modify state
+- Commands must be immutable (Records)
+- Separate queries (read) from commands (write)
+
+### Domain Events
+- Emit domain events from aggregates when important state changes
+- Events must be immutable (Records)
+- DO NOT use framework annotations (@EventListener) in domain layer
+
+### Testing
+- Unit tests: Mock dependencies, test business logic in isolation
+- Integration tests: Test complete flow with real dependencies
+- Keep tests simple and focused
+- Use descriptive names for tests: `shouldDoSomethingWhenCondition()`
+
+### Error Handling
+- Use Domain Exceptions for business errors
+- Do not use generic exceptions (RuntimeException) directly
+- Propagate errors appropriately between layers
+- Handle technical errors in infrastructure layer

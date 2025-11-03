@@ -1,0 +1,63 @@
+@startuml
+skinparam packageStyle rectangle
+skinparam roundcorner 10
+skinparam classBackgroundColor<<Infrastructure>> LightBlue
+skinparam classBackgroundColor<<Application>> LightGreen
+skinparam classBackgroundColor<<Domain>> LightYellow
+
+package "Infrastructure Layer (Outer)" {
+    class RESTControllers <<Infrastructure>>
+    class MongoDBAdapters <<Infrastructure>>
+    class AIAdapters <<Infrastructure>>
+    class SecurityAdapters <<Infrastructure>>
+    class SpringConfig <<Infrastructure>>
+}
+
+package "Application Layer (Middle)" {
+    class UseCases <<Application>>
+    class InputPorts <<Application>>
+}
+
+package "Domain Layer (Inner - Core)" {
+    class Entities <<Domain>>
+    class ValueObjects <<Domain>>
+    class DomainServices <<Domain>>
+    class OutputPorts <<Domain>>
+    class DomainEvents <<Domain>>
+    class DomainExceptions <<Domain>>
+}
+
+RESTControllers --> InputPorts : "depends on"
+UseCases ..|> InputPorts : "implements"
+UseCases --> Entities : "uses"
+UseCases --> ValueObjects : "uses"
+UseCases --> DomainServices : "uses"
+UseCases ..> OutputPorts : "depends on"
+MongoDBAdapters ..|> OutputPorts : "implements"
+AIAdapters ..|> OutputPorts : "implements"
+SecurityAdapters ..|> OutputPorts : "implements"
+SpringConfig --> UseCases : "wires"
+
+note right of Entities
+  **Domain Layer:**
+  - No framework dependencies
+  - Pure business logic
+  - Framework-independent
+end note
+
+note right of UseCases
+  **Application Layer:**
+  - Orchestrates use cases
+  - Depends on domain
+  - Framework-independent
+end note
+
+note right of RESTControllers
+  **Infrastructure Layer:**
+  - Framework-specific code
+  - Implements ports
+  - Can be swapped easily
+end note
+
+@enduml
+

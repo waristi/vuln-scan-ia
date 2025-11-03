@@ -5,8 +5,11 @@ import com.mercadolibre.vulnscania.application.usecase.GetVulnerabilityStatusUse
 import com.mercadolibre.vulnscania.application.usecase.RegisterApplicationUseCase;
 import com.mercadolibre.vulnscania.domain.port.output.*;
 import com.mercadolibre.vulnscania.domain.service.AIAssessmentValidationService;
+import com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIProviderSelector;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import java.util.function.Function;
 
 /**
  * Configuration class to register Domain Services and Use Cases as Spring beans.
@@ -54,6 +57,11 @@ public class DomainServiceConfiguration {
      * <p>This use case orchestrates the complete vulnerability evaluation process,
      * including CVE fetching, contextual scoring, AI analysis, and assessment creation.</p>
      * 
+     * <p><strong>Architecture Note</strong>: The use case now receives a Function instead of
+     * the AIProviderSelector directly. This maintains hexagonal architecture by keeping the
+     * application layer independent of infrastructure implementation details. The Function
+     * acts as an adapter between layers.</p>
+     * 
      * <p>Note: VulnerabilityScoringService is no longer needed! The business logic
      * for contextual scoring now lives in the Vulnerability aggregate itself (Rich Domain Model).</p>
      * 
@@ -61,7 +69,7 @@ public class DomainServiceConfiguration {
      * @param applicationRepository repository for application data
      * @param vulnerabilityRepository repository for vulnerability data
      * @param assessmentRepository repository for assessment data
-     * @param aiAnalysisPort port for AI analysis service
+     * @param aiProviderSelector infrastructure service to resolve AI providers (wrapped in Function)
      * @param validationService service for validating AI results
      * @param eventPublisher publisher for domain events
      * @return EvaluateVulnerabilityUseCase instance
@@ -72,16 +80,19 @@ public class DomainServiceConfiguration {
             ApplicationRepository applicationRepository,
             VulnerabilityRepository vulnerabilityRepository,
             AssessmentRepository assessmentRepository,
-            com.mercadolibre.vulnscania.infrastructure.adapter.output.ai.AIProviderSelector aiProviderSelector,
+            AIProviderSelector aiProviderSelector,
             AIAssessmentValidationService validationService,
             DomainEventPublisher eventPublisher) {
+        
+        // Wrap AIProviderSelector in a Function to decouple use case from infrastructure
+        Function<String, AIAnalysisPort> aiProviderResolver = aiProviderSelector::getProvider;
         
         return new EvaluateVulnerabilityUseCase(
             catalogPort,
             applicationRepository,
             vulnerabilityRepository,
             assessmentRepository,
-            aiProviderSelector,
+            aiProviderResolver,  // Pass function instead of infrastructure class
             validationService,
             eventPublisher
         );

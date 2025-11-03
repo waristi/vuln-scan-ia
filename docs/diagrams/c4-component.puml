@@ -1,0 +1,41 @@
+@startuml C4_Component
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title Component Diagram - Web Application
+
+Person(user, "User")
+
+System_Ext(openai, "OpenAI API")
+System_Ext(claude, "Claude API")
+System_Ext(gemini, "Gemini API")
+System_Ext(nvd_api, "NVD API")
+
+Container_Boundary(c1, "Web Application") {
+    Component(controllers, "REST Controllers", "Spring REST", "Handles HTTP requests, validation, authentication")
+    Component(usecases, "Use Cases", "Java", "Orchestrates business logic")
+    Component(domain, "Domain Model", "Java", "Business entities, value objects, domain services")
+    Component(ports, "Ports", "Java Interfaces", "Defines contracts for external dependencies")
+    Component(adapters_input, "Input Adapters", "Spring", "REST controllers, DTOs, security filters")
+    Component(adapters_output, "Output Adapters", "Spring", "MongoDB, AI providers, NVD API, JWT")
+    Component(security, "Security", "Spring Security", "JWT authentication, password encoding, security headers")
+}
+
+ContainerDb(mongodb, "MongoDB")
+
+Rel(user, controllers, "Makes HTTP requests")
+Rel(controllers, usecases, "Delegates to")
+Rel(usecases, domain, "Uses")
+Rel(usecases, ports, "Depends on")
+Rel(adapters_input, controllers, "Implements")
+Rel(adapters_output, ports, "Implements")
+Rel(security, controllers, "Protects")
+Rel(adapters_output, mongodb, "Reads/Writes")
+Rel(adapters_output, openai, "Calls")
+Rel(adapters_output, claude, "Calls")
+Rel(adapters_output, gemini, "Calls")
+Rel(adapters_output, nvd_api, "Calls")
+
+@enduml
+
