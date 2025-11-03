@@ -30,13 +30,13 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 # Crear usuario no-root para ejecutar la aplicación
-RUN groupadd -r spring && useradd -r -g spring spring
+RUN groupadd -r spring && useradd -r -g spring -m spring
 
 # Copiar el JAR desde el stage de build
 COPY --from=build /app/build/libs/*.jar app.jar
 
-# Cambiar propiedad del archivo al usuario spring
-RUN chown spring:spring app.jar
+# Cambiar propiedad del archivo y directorio al usuario spring
+RUN chown -R spring:spring /app
 
 # Cambiar al usuario no-root
 USER spring:spring
