@@ -21,24 +21,37 @@ import java.util.List;
 
 /**
  * Security filter that validates JWT access tokens for protected endpoints.
- * 
+ *
  * <p>This filter intercepts HTTP requests and validates the JWT token in the
  * Authorization header. Public endpoints (login, refresh, health) are excluded
  * from authentication.</p>
- * 
+ *
  * <p><strong>Token Format</strong>: Bearer {access_token}</p>
- * 
+ *
  * <p><strong>Note</strong>: This filter is not annotated with @Component because
  * it's created and configured directly in SecurityConfiguration to avoid duplicate
  * filter registration.</p>
+ *
+ * @author Bernardo Zuluaga
+ * @since 1.0.0
  */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    
+
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
-    
+
+    /**
+     * HTTP Authorization header name.
+     */
     private static final String AUTHORIZATION_HEADER = "Authorization";
+
+    /**
+     * Bearer token prefix.
+     */
     private static final String BEARER_PREFIX = "Bearer ";
-    
+
+    /**
+     * List of public endpoints that don't require authentication.
+     */
     private static final List<String> PUBLIC_ENDPOINTS = Arrays.asList(
         "/api/v1/auth/register",
         "/api/v1/auth/login",
@@ -47,71 +60,96 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         "/swagger-ui",
         "/v3/api-docs"
     );
-    
+
     private final TokenGeneratorPort tokenValidator;
-    
+
+    /**
+     * Constructs a new JwtAuthenticationFilter.
+     *
+     * @param tokenValidator the token validator port for validating JWT tokens
+     */
     public JwtAuthenticationFilter(TokenGeneratorPort tokenValidator) {
         this.tokenValidator = tokenValidator;
     }
-    
+
+    /**
+     * Filters incoming requests and validates JWT tokens.
+     *
+     * <p>Public endpoints bypass authentication. Protected endpoints require
+     * a valid JWT token in the Authorization header. Valid tokens result in
+     * authentication being set in the Spring Security context.</p>
+     *
+     * @param request the HTTP servlet request
+     * @param response the HTTP servlet response
+     * @param filterChain the filter chain
+     * @throws ServletException if a servlet error occurs
+     * @throws IOException if an I/O error occurs
+     */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
-        
+
         String requestPath = request.getRequestURI();
-        
-        // Skip validation for public endpoints
+
         if (isPublicEndpoint(requestPath)) {
             filterChain.doFilter(request, response);
             return;
         }
-        
+
         String authorizationHeader = request.getHeader(AUTHORIZATION_HEADER);
-        
+
         if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
             log.warn("Missing or invalid Authorization header for request to: {}", requestPath);
-            sendUnauthorizedResponse(response, "Missing or invalid Authorization header. Use format: Bearer {token}");
+            sendUnauthorizedResponse(response);
             return;
         }
-        
-        // Extract token
+
         String token = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
-        
-        // Validate access token
+
         String userId = tokenValidator.validateAccessToken(token);
         if (userId == null) {
             log.warn("Invalid or expired access token for request to: {}", requestPath);
-            sendUnauthorizedResponse(response, "Invalid or expired access token");
+            sendUnauthorizedResponse(response);
             return;
         }
-        
-        // Token is valid, create Authentication object and set it in SecurityContext
-        // This tells Spring Security that the request is authenticated
+
         Authentication authentication = new UsernamePasswordAuthenticationToken(
             userId,
             null,
             Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
         );
-        
+
         SecurityContextHolder.getContext().setAuthentication(authentication);
-        
-        // Add user ID to request for downstream use (optional, can also get from SecurityContext)
+
         request.setAttribute("userId", userId);
-        
-        // Continue with request
+
         filterChain.doFilter(request, response);
     }
-    
+
+    /**
+     * Checks if the given path is a public endpoint.
+     *
+     * @param path the request path to check
+     * @return true if the path is a public endpoint that doesn't require authentication
+     */
     private boolean isPublicEndpoint(String path) {
         return PUBLIC_ENDPOINTS.stream().anyMatch(path::startsWith);
     }
-    
-    private void sendUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
+
+    /**
+     * Sends an unauthorized response with a generic error message.
+     *
+     * <p>Uses a generic message to avoid information disclosure about
+     * authentication failures.</p>
+     *
+     * @param response the HTTP servlet response
+     * @throws IOException if an I/O error occurs while writing the response
+     */
+    private void sendUnauthorizedResponse(HttpServletResponse response) throws IOException {
         response.setStatus(HttpStatus.UNAUTHORIZED.value());
         response.setContentType("application/json");
-        // Use generic message to avoid information disclosure
         response.getWriter().write(
             "{\"error\":\"Unauthorized\",\"message\":\"Invalid or missing authentication token\"}"
         );

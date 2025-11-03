@@ -19,7 +19,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  *   <li>Human review flagging for high-risk or uncertain assessments</li>
  * </ul>
  * 
- * @author MercadoLibre
+ * @author Bernardo Zuluaga
  * @since 1.0.0
  */
 @SpringBootApplication

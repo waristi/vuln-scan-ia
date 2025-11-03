@@ -2,6 +2,7 @@ package com.mercadolibre.vulnscania.infrastructure.adapter.output.ai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mercadolibre.vulnscania.domain.constants.AIAssessmentConstants;
 import com.mercadolibre.vulnscania.domain.model.application.Application;
 import com.mercadolibre.vulnscania.domain.model.vulnerability.SeverityScore;
 import com.mercadolibre.vulnscania.domain.model.vulnerability.Vulnerability;
@@ -210,21 +211,21 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
         
         double score = analysisJson.path("score").asDouble();
         String justification = analysisJson.path("justification").asText();
-        double confidence = analysisJson.path("confidence").asDouble(DEFAULT_HIGH_CONFIDENCE);
-        
+        double confidence = analysisJson.path("confidence").asDouble(AIAssessmentConstants.DEFAULT_HIGH_CONFIDENCE);
+
         if (!isValidScore(score)) {
             log.warn("Invalid score from Gemini: {}, clamping to valid range", score);
             score = Math.max(0.0, Math.min(10.0, score));
         }
-        
+
         if (!isValidJustification(justification)) {
             throw new RuntimeException("Invalid justification from Gemini");
         }
-        
+
         if (!isValidConfidence(confidence)) {
-            log.warn("Invalid confidence from Gemini: {}, defaulting to {}", 
-                confidence, DEFAULT_HIGH_CONFIDENCE);
-            confidence = DEFAULT_HIGH_CONFIDENCE;
+            log.warn("Invalid confidence from Gemini: {}, defaulting to {}",
+                confidence, AIAssessmentConstants.DEFAULT_HIGH_CONFIDENCE);
+            confidence = AIAssessmentConstants.DEFAULT_HIGH_CONFIDENCE;
         }
         
         return new AIAnalysisResult(
@@ -285,7 +286,7 @@ public class GeminiAnalysisAdapter extends AbstractAIAnalysisAdapter implements 
         return new AIAnalysisResult(
             vulnerability.getBaseScore(),
             "Gemini AI analysis unavailable - using base CVSS score",
-            DEFAULT_FALLBACK_CONFIDENCE,
+            AIAssessmentConstants.DEFAULT_FALLBACK_CONFIDENCE,
             PROVIDER + " (fallback)"
         );
     }

@@ -12,22 +12,34 @@ import com.mercadolibre.vulnscania.domain.exception.WeakPasswordException;
  * <p><strong>Password Requirements</strong>:</p>
  * <ul>
  *   <li>Minimum length: 8 characters</li>
+ *   <li>Maximum length: 128 characters</li>
  *   <li>Must contain at least one uppercase letter</li>
  *   <li>Must contain at least one lowercase letter</li>
  *   <li>Must contain at least one digit</li>
  *   <li>Must contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)</li>
  * </ul>
+ *
+ * @author Bernardo Zuluaga
+ * @since 1.0.0
  */
 public class PasswordValidationService {
 
+    /**
+     * Minimum password length requirement.
+     */
     private static final int MIN_PASSWORD_LENGTH = 8;
+
+    /**
+     * Maximum password length limit.
+     */
     private static final int MAX_PASSWORD_LENGTH = 128;
 
     /**
-     * Validates password strength.
+     * Validates password strength according to OWASP recommendations.
      *
-     * @param password The password to validate
+     * @param password the password to validate
      * @throws WeakPasswordException if the password does not meet strength requirements
+     * @throws NullPointerException if password is null
      */
     public void validatePasswordStrength(String password) {
         if (password == null || password.isBlank()) {
@@ -83,8 +95,10 @@ public class PasswordValidationService {
     /**
      * Checks if a character is a special character allowed in passwords.
      *
-     * @param c The character to check
-     * @return true if the character is a special character
+     * <p>Allowed special characters: !@#$%^&*()_+-=[]{}|;:,.<>?</p>
+     *
+     * @param c the character to check
+     * @return true if the character is an allowed special character
      */
     private boolean isSpecialCharacter(char c) {
         String specialChars = "!@#$%^&*()_+-=[]{}|;:,.<>?";
