@@ -48,5 +48,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8080/actuator/health || exit 1
 
-# Ejecutar aplicación con configuración optimizada para contenedores con recursos limitados
-ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS:--Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:ParallelGCThreads=1 -XX:ConcGCThreads=1 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Xss256k} -jar app.jar"]
+# Ejecutar aplicación con Serial GC (no necesita threads de GC) para servidores muy limitados
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS:--Xms128m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseSerialGC -Xss256k -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap} -jar app.jar"]
